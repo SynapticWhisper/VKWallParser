@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Any, Optional
+from itertools import accumulate
 import httpx
 
 from .. import config
@@ -72,7 +73,6 @@ class VkRequests:
             else:
                 yield list(filter(lambda x: x["date"] >= timestamp, post_list))
 
-
     @classmethod
     def get_comments(cls, owner_id: int, post_id: int, count: int = 100, offset: int = 0):
         """Получение комментариев для поста"""
@@ -93,21 +93,51 @@ class VkRequests:
         if not comments_list:
             return
         
-        while comments_count > 0:
+        while comments_count >= 0:
             yield comments_list
             if len(comments_list) < count:
                 break
             comments_count -= len(comments_list)
             params["offset"] += len(comments_list)
             comments_list = cls.__get(method, params).get('items', [])
-        
-        if comments_list:
+        else:
             yield comments_list
-        
-
-
 
     @classmethod
-    def get_likes(cls, domain: Optional[str] = None, owner_id: Optional[int] = None) -> list[dict]:
+    def get_likes(
+        cls,
+        owner_id: int,
+        item_id: int,
+        type: str = 'post',
+        count: int = 1000,
+        offset: int = 0
+    ):
         """Получение лайков для поста"""
-        ...
+        method = "likes.getList"
+
+        params: dict = {
+            "type": type,
+            "owner_id": owner_id,
+            "item_id": item_id,
+            "offset": offset,
+            "count": count,
+            "v": config.API_VERSION,
+        }
+
+        response: dict = cls.__get(method, params)
+        likes_count: int = response.get('count', 0)
+        user_ids: list[list] = response.get('items', [])
+
+        if not user_ids:
+            return
+        
+        while likes_count >= 0:
+            yield [i for i in accumulate(user_ids)][-1]
+            if len(user_ids) < count:
+                break
+            likes_count -= len(user_ids)
+            params["offset"] += len(user_ids)
+            user_ids = cls.__get(method, params).get('items', [])
+        else:
+            yield [i for i in accumulate(user_ids)][-1]
+
