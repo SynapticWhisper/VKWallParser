@@ -35,14 +35,14 @@ class VkRequests:
         domain: Optional[str] = None,
         owner_id: Optional[int] = None,
         count: int = 100,
+        offset: int = 0,
     ):
         if domain is None and owner_id is None:
             raise ValueError("Either 'domain' or 'owner_id' must be provided")
         
         timestamp: int = int(date_limit.timestamp())
         method = "wall.get"
-        offset: int = 0
-
+        
         params: dict = {
             "offset": offset,
             "count": count,
@@ -74,9 +74,35 @@ class VkRequests:
 
 
     @classmethod
-    def get_comments(cls, owner_id: int, post_id: int, count: int = 100):
+    def get_comments(cls, owner_id: int, post_id: int, count: int = 100, offset: int = 0):
         """Получение комментариев для поста"""
-        ...
+        method = "wall.get"
+
+        params: dict = {
+            "owner_id": owner_id,
+            "post_id": post_id,
+            "offset": offset,
+            "count": count,
+            "v": config.API_VERSION,
+        }
+        
+        response: dict = cls.__get(method, params)
+        comments_count: int = response.get('count', 0)
+        comments_list: list[dict] = response.get('items', [])
+
+        if not comments_list:
+            return
+        
+        while comments_count > 0:
+            yield comments_list
+            if len(comments_list) < count:
+                break
+            comments_count -= len(comments_list)
+            params["offset"] += len(comments_list)
+            comments_list = cls.__get(method, params).get('items', [])
+        
+        if comments_list:
+            yield comments_list
         
 
 
