@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Any, Optional
-from itertools import accumulate
+from typing import Any, Generator, Optional
+from itertools import chain
 import httpx
 
 from .. import config
@@ -37,7 +37,8 @@ class VkRequests:
         owner_id: Optional[int] = None,
         count: int = 100,
         offset: int = 0,
-    ):
+    ) -> Generator[list[dict], None, None]:
+        """Получение постов"""
         if domain is None and owner_id is None:
             raise ValueError("Either 'domain' or 'owner_id' must be provided")
         
@@ -62,21 +63,27 @@ class VkRequests:
         
         if post_list[-1]["date"] < timestamp:
             yield list(filter(lambda x: x["date"] >= timestamp, post_list))
+        
+        while post_list[-1]["date"] >= timestamp:
+            yield post_list
+            if len(post_list) < count:
+                break
+            offset += len(post_list)
+            params["offset"] = offset
+            post_list = cls.__get(method, params).get('items', [])
         else:
-            while post_list[-1]["date"] >= timestamp:
-                yield post_list
-                if len(post_list) < count:
-                    break
-                offset += len(post_list)
-                params["offset"] = offset
-                post_list = cls.__get(method, params).get('items', [])
-            else:
-                yield list(filter(lambda x: x["date"] >= timestamp, post_list))
+            yield list(filter(lambda x: x["date"] >= timestamp, post_list))
 
     @classmethod
-    def get_comments(cls, owner_id: int, post_id: int, count: int = 100, offset: int = 0):
+    def get_comments(
+        cls,
+        owner_id: int,
+        post_id: int,
+        count: int = 100,
+        offset: int = 0
+    ) -> Generator[list[dict], None, None]:
         """Получение комментариев для поста"""
-        method = "wall.get"
+        method = "wall.getComments"
 
         params: dict = {
             "owner_id": owner_id,
@@ -86,22 +93,15 @@ class VkRequests:
             "v": config.API_VERSION,
         }
         
-        response: dict = cls.__get(method, params)
-        comments_count: int = response.get('count', 0)
-        comments_list: list[dict] = response.get('items', [])
-
-        if not comments_list:
-            return
-        
-        while comments_count >= 0:
+        while True:
+            response: dict = cls.__get(method, params)
+            comments_list: list[dict] = response.get('items', [])
+            if not comments_list:
+                break
             yield comments_list
             if len(comments_list) < count:
                 break
-            comments_count -= len(comments_list)
             params["offset"] += len(comments_list)
-            comments_list = cls.__get(method, params).get('items', [])
-        else:
-            yield comments_list
 
     @classmethod
     def get_likes(
@@ -111,7 +111,7 @@ class VkRequests:
         type: str = 'post',
         count: int = 1000,
         offset: int = 0
-    ):
+    ) -> Generator[list[int], None, None]:
         """Получение лайков для поста"""
         method = "likes.getList"
 
@@ -123,21 +123,14 @@ class VkRequests:
             "count": count,
             "v": config.API_VERSION,
         }
-
-        response: dict = cls.__get(method, params)
-        likes_count: int = response.get('count', 0)
-        user_ids: list[list] = response.get('items', [])
-
-        if not user_ids:
-            return
         
-        while likes_count >= 0:
-            yield [i for i in accumulate(user_ids)][-1]
+        while True:
+            response: dict = cls.__get(method, params)
+            user_ids: list[list[int]] = response.get('items', [])
+            if not user_ids:
+                break
+            yield list(chain.from_iterable(user_ids))
             if len(user_ids) < count:
                 break
-            likes_count -= len(user_ids)
             params["offset"] += len(user_ids)
-            user_ids = cls.__get(method, params).get('items', [])
-        else:
-            yield [i for i in accumulate(user_ids)][-1]
 
