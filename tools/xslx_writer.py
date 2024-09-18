@@ -37,24 +37,29 @@ def save_to_excel(
         owner_id: Optional[int] = None,
     ):
     """Сохранение данных в Excel файл по частям"""
-    
-    with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
-        posts_df = pd.DataFrame()
-        comments_df = pd.DataFrame()
-        likes_df = pd.DataFrame()
+    post_row = 0
+    comment_row = 0
+    like_row = 0
 
+    with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
         for posts_chunk in VkRequests.get_posts(date_limit, domain, owner_id):
             filtered_posts = filter_post_data(posts_chunk)
             posts_df = pd.DataFrame(filtered_posts)
-            posts_df.to_excel(writer, sheet_name='Посты', index=False, header=not writer.sheets)
+
+            posts_df.to_excel(writer, sheet_name='Посты', index=False, startrow=post_row, header=not post_row)
+            post_row += len(posts_df)
 
             for post in posts_chunk:
                 for comments_chunk in VkRequests.get_comments(post["from_id"], post["id"]):
                     filtered_comments = filter_comment_data(comments_chunk, post["id"])
                     comments_df = pd.DataFrame(filtered_comments)
-                    comments_df.to_excel(writer, sheet_name='Комментарии', index=False, header=not writer.sheets)
+                    
+                    comments_df.to_excel(writer, sheet_name='Комментарии', index=False, startrow=comment_row, header=not comment_row)
+                    comment_row += len(comments_df)
 
                 for likes_chunk in VkRequests.get_likes(post["from_id"], post["id"]):
                     filtered_likes = filter_like_data(likes_chunk, post["id"])
                     likes_df = pd.DataFrame(filtered_likes)
-                    likes_df.to_excel(writer, sheet_name='Лайки', index=False, header=not writer.sheets)
+                    
+                    likes_df.to_excel(writer, sheet_name='Лайки', index=False, startrow=like_row, header=not like_row)
+                    like_row += len(likes_df)

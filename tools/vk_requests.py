@@ -3,7 +3,7 @@ from typing import Any, Generator, Optional
 from itertools import chain
 import httpx
 
-from .. import config
+import config
 
 class VkRequests:
     API_URL = "api.vk.com"
@@ -60,9 +60,10 @@ class VkRequests:
 
         if not post_list:
             return
-        
+
         if post_list[-1]["date"] < timestamp:
-            yield list(filter(lambda x: x["date"] >= timestamp, post_list))
+            res = list(filter(lambda x: x["date"] >= timestamp, post_list))
+            yield res
         
         while post_list[-1]["date"] >= timestamp:
             yield post_list
@@ -71,6 +72,8 @@ class VkRequests:
             offset += len(post_list)
             params["offset"] = offset
             post_list = cls.__get(method, params).get('items', [])
+            if not post_list:
+                break
         else:
             yield list(filter(lambda x: x["date"] >= timestamp, post_list))
 
@@ -109,7 +112,7 @@ class VkRequests:
         owner_id: int,
         item_id: int,
         type: str = 'post',
-        count: int = 1000,
+        count: int = 100,
         offset: int = 0
     ) -> Generator[list[int], None, None]:
         """Получение лайков для поста"""
@@ -126,10 +129,10 @@ class VkRequests:
         
         while True:
             response: dict = cls.__get(method, params)
-            user_ids: list[list[int]] = response.get('items', [])
+            user_ids: list[int] = response.get('items', [])
             if not user_ids:
                 break
-            yield list(chain.from_iterable(user_ids))
+            yield user_ids
             if len(user_ids) < count:
                 break
             params["offset"] += len(user_ids)
