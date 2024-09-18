@@ -16,7 +16,7 @@ def main():
 
     _group: str = args.group_url.split('/')[-1]
     values = ("event", "club", "public")
-    is_owner_id = reduce(lambda x, y: x | y, [_group.startswith(value) for value in values])
+    is_owner_id = any(_group.startswith(value) for value in values)
     if is_owner_id:
         owner_id = _group
         for value in values:

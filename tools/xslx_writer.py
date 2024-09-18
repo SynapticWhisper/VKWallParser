@@ -41,6 +41,12 @@ def save_to_excel(
     comment_row = 0
     like_row = 0
 
+
+    # Можно сначала собирать все в Dataframe, а потом записывать это все в файл
+    # При работе с большим количеством данных, сборка всех данных по категориям 
+    # датафрейм может вызвать проблемы с памятью, с небольшим количеством данных 
+    # целесообразнее сначала собрать все в DF а потом уже один раз записывать 
+    # это все в файл (операции с файлами = долго)
     with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
         for posts_chunk in VkRequests.get_posts(date_limit, domain, owner_id):
             filtered_posts = filter_post_data(posts_chunk)
