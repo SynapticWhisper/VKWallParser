@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Any, Generator, Optional
-from itertools import chain
 import httpx
 
 import config
+
 
 class VkRequests:
     API_URL = "api.vk.com"
@@ -25,10 +25,10 @@ class VkRequests:
         except httpx.RequestError as e:
             print(f"Error during request: {str(e)}")
             raise
-        
+
         data: dict = response.json().get('response', {})
         return data
-    
+
     @classmethod
     def get_posts(
         cls,
@@ -41,10 +41,10 @@ class VkRequests:
         """Получение постов"""
         if domain is None and owner_id is None:
             raise ValueError("Either 'domain' or 'owner_id' must be provided")
-        
+
         timestamp: int = int(date_limit.timestamp())
         method = "wall.get"
-        
+
         params: dict = {
             "offset": offset,
             "count": count,
@@ -64,7 +64,7 @@ class VkRequests:
         if post_list[-1]["date"] < timestamp:
             res = list(filter(lambda x: x["date"] >= timestamp, post_list))
             yield res
-        
+
         while post_list[-1]["date"] >= timestamp:
             yield post_list
             if len(post_list) < count:
@@ -95,7 +95,7 @@ class VkRequests:
             "count": count,
             "v": config.API_VERSION,
         }
-        
+
         while True:
             response: dict = cls.__get(method, params)
             comments_list: list[dict] = response.get('items', [])
@@ -126,7 +126,7 @@ class VkRequests:
             "count": count,
             "v": config.API_VERSION,
         }
-        
+
         while True:
             response: dict = cls.__get(method, params)
             user_ids: list[int] = response.get('items', [])
@@ -136,4 +136,3 @@ class VkRequests:
             if len(user_ids) < count:
                 break
             params["offset"] += len(user_ids)
-
